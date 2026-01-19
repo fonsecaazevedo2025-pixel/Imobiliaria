@@ -4,6 +4,7 @@ export interface ContactHistoryEntry {
   date: string;
   type: 'Telefone' | 'WhatsApp' | 'E-mail' | 'Reunião' | 'Vídeo';
   summary: string;
+  notes?: string;
   nextContactDate?: string;
 }
 

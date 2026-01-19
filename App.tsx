@@ -23,14 +23,23 @@ const ShareLinkModal: React.FC<{ url: string; onClose: () => void }> = ({ url, o
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
         <div className="p-8 text-center">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">🔗</div>
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">🌐</div>
           <h3 className="text-xl font-bold text-slate-800 mb-2">Link de Cadastro Público</h3>
-          <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32 mx-auto my-6 p-2 border rounded-2xl" />
+          <p className="text-sm text-slate-500 mb-6">Compartilhe este link com novos parceiros para que eles mesmos realizem o credenciamento.</p>
+          
+          <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32 mx-auto mb-6 p-2 border-2 border-slate-100 rounded-2xl bg-white shadow-sm" />
+          
           <div className="flex gap-2 items-center bg-slate-50 p-3 rounded-2xl border border-slate-200 mb-6">
-            <span className="text-[10px] font-mono truncate flex-1">{url}</span>
-            <button onClick={handleCopy} className="p-2 bg-white border rounded-lg hover:bg-blue-50">{copied ? '✅' : '📋'}</button>
+            <span className="text-[10px] font-mono truncate flex-1 text-slate-500 select-all">{url}</span>
+            <button 
+              onClick={handleCopy} 
+              className={`p-2 rounded-lg transition-all flex items-center gap-1 text-xs font-bold ${copied ? 'bg-green-500 text-white' : 'bg-white border text-blue-600 hover:bg-blue-50'}`}
+            >
+              {copied ? 'Copiado!' : '📋 Copiar'}
+            </button>
           </div>
-          <button onClick={onClose} className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">Fechar</button>
+          
+          <button onClick={onClose} className="w-full py-3.5 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-all active:scale-95 shadow-lg">Fechar</button>
         </div>
       </div>
     </div>
@@ -47,6 +56,10 @@ const App: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<string>('');
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [partnershipManagerFilter, setPartnershipManagerFilter] = useState('');
+  const [hiringManagerFilter, setHiringManagerFilter] = useState('');
+
   const [isPublicMode, setIsPublicMode] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -65,7 +78,6 @@ const App: React.FC = () => {
     if (saved) {
       setCompanies(JSON.parse(saved));
     } else {
-      // FIX: Added required partnershipManager property to the mock data object
       const mock: Company[] = [{
         id: '1', name: 'Horizonte Imóveis', cnpj: '12.345.678/0001-99', docType: 'CNPJ',
         cep: '01310-100', address: 'Av. Paulista, 1000 - Bela Vista - SP',
@@ -109,12 +121,20 @@ const App: React.FC = () => {
 
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.cnpj.includes(searchTerm);
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           c.cnpj.includes(searchTerm);
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
       const matchesMin = minBrokers === '' || c.brokerCount >= parseInt(minBrokers);
-      return matchesSearch && matchesStatus && matchesMin;
+      
+      const matchesPartnershipManager = partnershipManagerFilter === '' || 
+                                       c.partnershipManager?.toLowerCase().includes(partnershipManagerFilter.toLowerCase());
+      
+      const matchesHiringManager = hiringManagerFilter === '' || 
+                                  c.hiringManager?.toLowerCase().includes(hiringManagerFilter.toLowerCase());
+
+      return matchesSearch && matchesStatus && matchesMin && matchesPartnershipManager && matchesHiringManager;
     });
-  }, [companies, searchTerm, statusFilter, minBrokers]);
+  }, [companies, searchTerm, statusFilter, minBrokers, partnershipManagerFilter, hiringManagerFilter]);
 
   const handleSaveCompany = (data: Omit<Company, 'id' | 'registrationDate'>) => {
     if (editingCompany) {
@@ -139,11 +159,11 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         {registrationSuccess ? (
-          <div className="bg-white p-12 rounded-3xl shadow-2xl text-center max-w-md border">
+          <div className="bg-white p-12 rounded-3xl shadow-2xl text-center max-w-md border animate-fadeIn">
             <div className="text-5xl mb-6">✅</div>
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Sucesso!</h2>
             <p className="text-slate-500 mb-8">Seus dados foram enviados. Nossa equipe analisará e entrará em contato em breve.</p>
-            <button onClick={() => window.location.reload()} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold">Novo Cadastro</button>
+            <button onClick={() => window.location.reload()} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100">Novo Cadastro</button>
           </div>
         ) : (
           <div className="w-full max-w-2xl">
@@ -162,24 +182,30 @@ const App: React.FC = () => {
     <Layout activeTab={activeTab} setActiveTab={setActiveTab} companies={companies} upcomingContacts={upcomingContacts}>
       {activeTab === 'dashboard' && (
         <div className="space-y-8 animate-fadeIn">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h3 className="text-2xl font-bold text-slate-800">Visão Geral da Rede</h3>
               <p className="text-sm text-slate-500">Métricas consolidadas de desempenho e relacionamento.</p>
             </div>
-            <button onClick={() => setShowShareModal(true)} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 transition-all hover:scale-[1.02] active:scale-95">🔗 Link de Captação</button>
+            <button 
+              onClick={() => setShowShareModal(true)} 
+              className="group flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 transition-all hover:bg-blue-700 active:scale-95 border-2 border-transparent hover:border-blue-300"
+            >
+              <span className="text-lg group-hover:rotate-12 transition-transform">🌐</span>
+              Gerar Link de Cadastro Público
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Parceiros</p>
               <h4 className="text-3xl font-black text-slate-800 mt-2">{stats.totalCompanies}</h4>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Equipe Total</p>
               <h4 className="text-3xl font-black text-slate-800 mt-2">{stats.totalBrokers} <span className="text-xs text-slate-400 font-medium">corretores</span></h4>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Atividade</p>
               <h4 className="text-3xl font-black text-green-600 mt-2">{stats.activePercentage}%</h4>
             </div>
@@ -220,17 +246,39 @@ const App: React.FC = () => {
         <div className="space-y-6 animate-fadeIn">
           {!showForm ? (
             <>
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between no-print">
-                 <div className="relative w-full md:w-96">
-                   <input type="text" placeholder="Filtrar parceiros..." className="w-full pl-4 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                 </div>
-                 <button onClick={() => setShowForm(true)} className="w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all">Novo Parceiro</button>
+              {/* Filtros Avançados */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block px-1">Busca Geral (Nome/CNPJ)</label>
+                    <input type="text" placeholder="Ex: Horizonte Imóveis..." className="w-full pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                  </div>
+                  <div className="relative flex-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block px-1">Gestor da Parceria (Externo)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🤝</span>
+                      <input type="text" placeholder="Nome do gestor..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={partnershipManagerFilter} onChange={e => setPartnershipManagerFilter(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="relative flex-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block px-1">Gestor da Conta (Hub)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🆔</span>
+                      <input type="text" placeholder="Nome do consultor..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={hiringManagerFilter} onChange={e => setHiringManagerFilter(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="md:w-auto flex items-end">
+                    <button onClick={() => setShowForm(true)} className="w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all">Novo Parceiro</button>
+                  </div>
+                </div>
               </div>
+
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 border-b">
                     <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                       <th className="px-6 py-4">Empresa</th>
+                      <th className="px-6 py-4">Gestores</th>
                       <th className="px-6 py-4">Status</th>
                       <th className="px-6 py-4 text-center">Corretores</th>
                       <th className="px-6 py-4 text-right">Ações</th>
@@ -242,6 +290,16 @@ const App: React.FC = () => {
                         <td className="px-6 py-4">
                           <p className="font-bold text-slate-800">{c.name}</p>
                           <p className="text-[10px] text-slate-400 font-mono">{c.cnpj}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1">
+                              <span className="opacity-60">P:</span> {c.partnershipManager || 'N/D'}
+                            </p>
+                            <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
+                              <span className="opacity-60">H:</span> {c.hiringManager}
+                            </p>
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${c.status === 'Ativo' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{c.status}</span>
@@ -256,6 +314,12 @@ const App: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                {filteredCompanies.length === 0 && (
+                  <div className="p-12 text-center text-slate-400">
+                    <p className="text-xl mb-2">🔍</p>
+                    <p className="text-sm font-medium">Nenhum parceiro encontrado com os filtros aplicados.</p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
