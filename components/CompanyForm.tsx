@@ -78,8 +78,6 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     if (r.length <= 2) return `(${r}`;
     if (r.length <= 6) return `(${r.substring(0, 2)}) ${r.substring(2)}`;
     
-    // Se tiver 11 dígitos, é celular: (XX) 9XXXX-XXXX
-    // Se tiver 10 ou menos (enquanto digita), assume fixo até o 11º: (XX) XXXX-XXXX
     if (r.length <= 10) {
       return `(${r.substring(0, 2)}) ${r.substring(2, 6)}-${r.substring(6)}`;
     } else {
@@ -257,6 +255,12 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     }));
   };
 
+  const handleSendEmail = () => {
+    if (formData.email) {
+      window.location.href = `mailto:${formData.email}`;
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!docSuccess) {
@@ -339,7 +343,18 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
             
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-500">E-mail de Contato</label>
-              <input required type="email" className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${emailError ? 'border-red-400' : 'border-slate-200'}`} value={formData.email} onChange={e => { setFormData({ ...formData, email: e.target.value }); setEmailError(null); }} placeholder="exemplo@empresa.com.br" />
+              <div className="flex gap-2">
+                <input required type="email" className={`flex-1 px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${emailError ? 'border-red-400' : 'border-slate-200'}`} value={formData.email} onChange={e => { setFormData({ ...formData, email: e.target.value }); setEmailError(null); }} placeholder="exemplo@empresa.com.br" />
+                <button 
+                  type="button" 
+                  onClick={handleSendEmail} 
+                  disabled={!formData.email}
+                  className="px-4 py-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
+                  title="Enviar e-mail agora"
+                >
+                  📧
+                </button>
+              </div>
               {emailError && <p className="text-[10px] text-red-500 font-bold ml-1">{emailError}</p>}
             </div>
 
@@ -456,10 +471,14 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
           <div className="flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2">
             <span className="text-xs font-bold uppercase tracking-wider">Informações Adicionais</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-500">Responsável Operacional</label>
               <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.responsible} onChange={e => setFormData({ ...formData, responsible: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-500">Gestor Parceiro (Estratégico)</label>
+              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.partnershipManager} onChange={e => setFormData({ ...formData, partnershipManager: e.target.value })} placeholder="Nome do gestor no parceiro" />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-500">Gestor da Conta (Hub)</label>
