@@ -14,6 +14,8 @@ const BR_STATES = [
   'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
+const COMMISSION_OPTIONS = [1.5, 2, 3, 4, 5, 6];
+
 export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, initialData, isPublic = false }) => {
   const numberInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +62,16 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     return regex.test(email);
   };
 
+  const validatePhone = (phone: string): boolean => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 10 && digits.length !== 11) return false;
+    const ddd = parseInt(digits.substring(0, 2));
+    if (ddd < 11 || ddd > 99) return false;
+    if (digits.length === 11 && digits[2] !== '9') return false;
+    if (/^(\d)\1+$/.test(digits)) return false;
+    return true;
+  };
+
   const validateURL = (url: string): boolean => {
     if (!url) return true;
     try {
@@ -73,11 +85,9 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
   const maskPhone = (v: string) => {
     let r = v.replace(/\D/g, "");
     if (r.length > 11) r = r.substring(0, 11);
-    
     if (r.length === 0) return "";
     if (r.length <= 2) return `(${r}`;
     if (r.length <= 6) return `(${r.substring(0, 2)}) ${r.substring(2)}`;
-    
     if (r.length <= 10) {
       return `(${r.substring(0, 2)}) ${r.substring(2, 6)}-${r.substring(6)}`;
     } else {
@@ -85,7 +95,14 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     }
   };
 
-  const maskCEP = (v: string) => v.replace(/\D/g, "").substring(0, 8).replace(/^(\d{5})(\d)/, "$1-$2");
+  const maskCEP = (v: string) => {
+    const clean = v.replace(/\D/g, "").substring(0, 8);
+    if (clean.length > 5) {
+      return `${clean.substring(0, 5)}-${clean.substring(5)}`;
+    }
+    return clean;
+  };
+
   const maskCNPJ = (v: string) => v.replace(/\D/g, "").substring(0, 14).replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
   const maskCPF = (v: string) => v.replace(/\D/g, "").substring(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
 
@@ -129,6 +146,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
   const [cepError, setCepError] = useState<string | null>(null);
   const [docSuccess, setDocSuccess] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -179,10 +197,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
 
   const handleCEPLookup = async (cep: string) => {
     const clean = cep.replace(/\D/g, '');
-    if (clean.length !== 8) {
-      setCepError(clean.length > 0 ? "CEP incompleto" : null);
-      return;
-    }
+    if (clean.length !== 8) return;
     setIsCepLoading(true);
     setCepError(null);
     try {
@@ -202,7 +217,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
       }
     } catch (e) {
       console.error(e);
-      setCepError("Falha na conexão com ViaCEP");
+      setCepError("Falha na conexão");
     } finally {
       setIsCepLoading(false);
     }
@@ -271,10 +286,15 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
       setEmailError('E-mail inválido.');
       return;
     }
+    if (!validatePhone(formData.phone)) {
+      setPhoneError('Número de telefone inválido.');
+      return;
+    }
     if (formData.website && !validateURL(formData.website)) {
       setUrlError('URL do site inválida.');
       return;
     }
+
     const fullAddress = `${formData.street}, ${formData.number}${formData.complement ? ` - ${formData.complement}` : ''} - ${formData.neighborhood} - ${formData.city}/${formData.state}`;
     const { street, number, neighborhood, city, state, complement, ...rest } = formData;
     const latest = formData.contactHistory[0];
@@ -345,33 +365,20 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
               <label className="text-[10px] font-black uppercase text-slate-500">E-mail de Contato</label>
               <div className="flex gap-2">
                 <input required type="email" className={`flex-1 px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${emailError ? 'border-red-400' : 'border-slate-200'}`} value={formData.email} onChange={e => { setFormData({ ...formData, email: e.target.value }); setEmailError(null); }} placeholder="exemplo@empresa.com.br" />
-                <button 
-                  type="button" 
-                  onClick={handleSendEmail} 
-                  disabled={!formData.email}
-                  className="px-4 py-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
-                  title="Enviar e-mail agora"
-                >
-                  📧
-                </button>
+                <button type="button" onClick={handleSendEmail} disabled={!formData.email} className="px-4 py-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50" title="Enviar e-mail agora">📧</button>
               </div>
               {emailError && <p className="text-[10px] text-red-500 font-bold ml-1">{emailError}</p>}
             </div>
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-500">Telefone Principal</label>
-              <input required type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.phone} onChange={e => setFormData({ ...formData, phone: maskPhone(e.target.value) })} placeholder="(00) 00000-0000" />
+              <input required type="text" className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${phoneError ? 'border-red-400' : 'border-slate-200'}`} value={formData.phone} onChange={e => { setFormData({ ...formData, phone: maskPhone(e.target.value) }); setPhoneError(null); }} placeholder="(00) 00000-0000" />
+              {phoneError && <p className="text-[10px] text-red-500 font-bold ml-1">{phoneError}</p>}
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
               <label className="text-[10px] font-black uppercase text-slate-500">Site da Empresa</label>
-              <input 
-                type="text" 
-                className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${urlError ? 'border-red-400' : 'border-slate-200'}`} 
-                value={formData.website} 
-                onChange={handleURLChange} 
-                placeholder="www.empresa.com.br"
-              />
+              <input type="text" className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${urlError ? 'border-red-400' : 'border-slate-200'}`} value={formData.website} onChange={handleURLChange} placeholder="www.empresa.com.br" />
               {urlError && <p className="text-[10px] text-red-500 font-bold ml-1">{urlError}</p>}
             </div>
           </div>
@@ -381,7 +388,22 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
           <div className="bg-slate-50 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">CEP</label>
-              <input required className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.cep} onChange={e => { const v = maskCEP(e.target.value); setFormData({...formData, cep: v}); if(v.replace(/\D/g, '').length === 8) handleCEPLookup(v); }} />
+              <div className="relative">
+                <input 
+                  required 
+                  maxLength={9}
+                  className={`w-full px-4 py-3 bg-white border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${cepError ? 'border-red-300' : 'border-slate-200'}`} 
+                  value={formData.cep} 
+                  onChange={e => { 
+                    const v = maskCEP(e.target.value); 
+                    setFormData({...formData, cep: v}); 
+                    if(v.replace(/\D/g, '').length === 8) handleCEPLookup(v); 
+                  }} 
+                  placeholder="00000-000"
+                />
+                {isCepLoading && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
+              </div>
+              {cepError && <p className="text-[10px] text-red-500 font-bold ml-1">{cepError}</p>}
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Logradouro</label>
@@ -404,11 +426,33 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
           </div>
         </section>
 
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Acordo Comercial</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-slate-500">Status do Parceiro</label>
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                <button type="button" onClick={() => setFormData({ ...formData, status: 'Ativo' })} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.status === 'Ativo' ? 'bg-green-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>Ativo</button>
+                <button type="button" onClick={() => setFormData({ ...formData, status: 'Inativo' })} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.status === 'Inativo' ? 'bg-slate-400 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>Inativo</button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-slate-500">Taxa de Comissão (%)</label>
+              <div className="grid grid-cols-3 gap-2">
+                {COMMISSION_OPTIONS.map((rate) => (
+                  <button key={rate} type="button" onClick={() => setFormData({ ...formData, commissionRate: rate })} className={`py-2 text-xs font-bold rounded-lg border transition-all ${formData.commissionRate === rate ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'}`}>{rate}%</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="space-y-6">
           <div className="flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2">
             <span className="text-xs font-bold uppercase tracking-wider">Histórico de Relacionamento</span>
           </div>
-          
           <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -432,39 +476,16 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-blue-600">Anotações Detalhadas</label>
-              <textarea className="w-full px-4 py-2 bg-white border border-blue-200 rounded-xl outline-none text-sm min-h-[100px] resize-none" placeholder="Detalhes específicos da conversa, acordos feitos, pontos de atenção..." value={newHistory.notes} onChange={e => setNewHistory({...newHistory, notes: e.target.value})} />
+              <textarea className="w-full px-4 py-2 bg-white border border-blue-200 rounded-xl outline-none text-sm min-h-[100px] resize-none" placeholder="Detalhes específicos..." value={newHistory.notes} onChange={e => setNewHistory({...newHistory, notes: e.target.value})} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-blue-600">Próximo Contato (Agendamento)</label>
+                <label className="text-[10px] font-black uppercase text-blue-600">Próximo Contato</label>
                 <input type="date" className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-xl outline-none" value={newHistory.nextContactDate} onChange={e => setNewHistory({...newHistory, nextContactDate: e.target.value})} />
               </div>
-              <button type="button" onClick={handleAddHistory} className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-blue-700 transition-all">
-                Registrar Interação
-              </button>
+              <button type="button" onClick={handleAddHistory} className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-blue-700 transition-all">Registrar Interação</button>
             </div>
           </div>
-
-          {formData.contactHistory.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Registros Recentes</p>
-              <div className="divide-y divide-slate-100 bg-slate-50 rounded-xl border border-slate-200 max-h-64 overflow-y-auto">
-                {formData.contactHistory.map(h => (
-                  <div key={h.id} className="p-4 flex flex-col hover:bg-white transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600">{h.type}</span>
-                        <span className="text-[10px] text-slate-400 font-bold">{new Date(h.date).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                      <button type="button" onClick={() => removeHistoryEntry(h.id)} className="text-slate-300 hover:text-red-500 p-1">✕</button>
-                    </div>
-                    <p className="text-sm font-bold text-slate-800 mb-1">{h.summary}</p>
-                    {h.notes && <p className="text-xs text-slate-500 line-clamp-2 italic">"{h.notes}"</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
         <section className="space-y-4">
@@ -477,17 +498,13 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
               <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.responsible} onChange={e => setFormData({ ...formData, responsible: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-500">Gestor Parceiro (Estratégico)</label>
-              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.partnershipManager} onChange={e => setFormData({ ...formData, partnershipManager: e.target.value })} placeholder="Nome do gestor no parceiro" />
+              <label className="text-[10px] font-black uppercase text-slate-500">Gestor Parceiro</label>
+              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.partnershipManager} onChange={e => setFormData({ ...formData, partnershipManager: e.target.value })} placeholder="Nome do gestor" />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-500">Gestor da Conta (Hub)</label>
               <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.hiringManager} onChange={e => setFormData({ ...formData, hiringManager: e.target.value })} disabled={isPublic} />
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase text-slate-500">Observações Gerais (Cadastro)</label>
-            <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-none text-sm" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Notas internas, diferenciais competitivos ou restrições..." />
           </div>
         </section>
 
