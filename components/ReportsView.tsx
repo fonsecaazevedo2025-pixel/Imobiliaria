@@ -22,12 +22,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
     }, 100);
   };
 
-  const sanitizePhone = (phone: string) => {
-    const clean = phone.replace(/\D/g, '');
-    const ddi = clean.length <= 11 ? '55' : '';
-    return `${ddi}${clean}`;
-  };
-
   const handleExportSummaryPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
     const dateStr = new Date().toLocaleString('pt-BR');
@@ -64,6 +58,92 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
       styles: { fontSize: 9, cellPadding: 3 },
     });
     doc.save(`relatorio-geral-parceiros-${new Date().getTime()}.pdf`);
+  };
+
+  const handleExportStaticHTML = () => {
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Parceiros - PartnerHub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f8fafc; font-family: sans-serif; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 flex justify-between items-end">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-600">PartnerHub</h1>
+                <p class="text-slate-500">Relatório Estratégico de Imobiliárias Parceiras</p>
+            </div>
+            <div class="text-right text-xs text-slate-400">
+                Gerado em: ${new Date().toLocaleString('pt-BR')}
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6 border-l-4 border-blue-500">
+                <p class="text-xs font-bold text-slate-400 uppercase">Total Parceiros</p>
+                <p class="text-3xl font-bold">${companies.length}</p>
+            </div>
+            <div class="card p-6 border-l-4 border-green-500">
+                <p class="text-xs font-bold text-slate-400 uppercase">Equipe Total</p>
+                <p class="text-3xl font-bold">${companies.reduce((a, b) => a + b.brokerCount, 0)}</p>
+            </div>
+            <div class="card p-6 border-l-4 border-amber-500">
+                <p class="text-xs font-bold text-slate-400 uppercase">Ativos</p>
+                <p class="text-3xl font-bold">${companies.filter(c => c.status === 'Ativo').length}</p>
+            </div>
+        </div>
+
+        <div class="card overflow-hidden">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 border-b">
+                    <tr class="text-xs font-bold text-slate-500 uppercase">
+                        <th class="p-4">Empresa</th>
+                        <th class="p-4">Documento</th>
+                        <th class="p-4">Gestor Hub</th>
+                        <th class="p-4">Equipe</th>
+                        <th class="p-4 text-center">Comissão</th>
+                        <th class="p-4 text-right">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    ${companies.map(c => `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="p-4 font-bold text-slate-800">${c.name}</td>
+                            <td class="p-4 text-xs text-slate-500">${c.cnpj}</td>
+                            <td class="p-4 text-sm text-blue-600 font-medium">${c.hiringManager}</td>
+                            <td class="p-4 text-sm font-bold text-slate-600">${c.brokerCount}</td>
+                            <td class="p-4 text-center text-emerald-600 font-bold">${c.commissionRate}%</td>
+                            <td class="p-4 text-right">
+                                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${c.status === 'Ativo' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">
+                                    ${c.status}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        
+        <footer class="mt-8 text-center text-xs text-slate-400">
+            © ${new Date().getFullYear()} PartnerHub - Sistema de Gestão de Imobiliárias
+        </footer>
+    </div>
+</body>
+</html>`;
+    
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio_web_parceiros_${new Date().getTime()}.html`;
+    link.click();
   };
 
   const handleExportGeographicPDF = async () => {
@@ -193,8 +273,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
           <p className="text-slate-500 text-sm">Gere documentação completa para reuniões e auditorias.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={handlePrint} className="px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl font-semibold hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-            <span>🖨️</span> Imprimir Lista
+          <button type="button" onClick={handleExportStaticHTML} className="px-4 py-2.5 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-900 transition-all shadow-sm flex items-center gap-2">
+            <span>🌐</span> Exportar Web Report
           </button>
           <button type="button" onClick={handleExportGeographicPDF} disabled={isGeneratingGeoReport} className={`px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold transition-all shadow-lg shadow-emerald-100 flex items-center gap-2 ${isGeneratingGeoReport ? 'opacity-50 cursor-wait' : 'hover:bg-emerald-700 active:scale-95'}`}>
             {isGeneratingGeoReport ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <span>📍</span>} Relatório Geográfico

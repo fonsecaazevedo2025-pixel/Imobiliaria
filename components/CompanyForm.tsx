@@ -16,6 +16,14 @@ const BR_STATES = [
 
 const COMMISSION_OPTIONS = [1.5, 2, 3, 4, 5, 6];
 
+const CONTACT_TYPES: { value: ContactHistoryEntry['type']; label: string; icon: string }[] = [
+  { value: 'Telefone', label: 'Telefone', icon: '📞' },
+  { value: 'WhatsApp', label: 'WhatsApp', icon: '💬' },
+  { value: 'E-mail', label: 'E-mail', icon: '📧' },
+  { value: 'Reunião', label: 'Reunião', icon: '🤝' },
+  { value: 'Vídeo', label: 'Vídeo', icon: '🎥' },
+];
+
 export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, initialData, isPublic = false }) => {
   const numberInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,6 +113,17 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
 
   const maskCNPJ = (v: string) => v.replace(/\D/g, "").substring(0, 14).replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
   const maskCPF = (v: string) => v.replace(/\D/g, "").substring(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+  
+  const maskCRECI = (v: string) => {
+    let clean = v.replace(/[^0-9jfJF]/g, "").toUpperCase();
+    if (clean.length > 8) clean = clean.substring(0, 8);
+    if (clean.includes('J') || clean.includes('F')) {
+      const type = clean.includes('J') ? 'J' : 'F';
+      const numbers = clean.replace(/[JF]/g, '');
+      return numbers ? `${numbers}-${type}` : type;
+    }
+    return clean;
+  };
 
   const [docType, setDocType] = useState<'CNPJ' | 'CPF' | 'CRECI'>(initialData?.docType || 'CNPJ');
   const [formData, setFormData] = useState({
@@ -168,8 +187,10 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     let isValid = false;
     if (docType === 'CNPJ') isValid = validateCNPJ(formData.cnpj);
     else if (docType === 'CPF') isValid = validateCPF(formData.cnpj);
-    else isValid = formData.creci.trim().length >= 2 && formData.creciUF !== '';
-    
+    else {
+      const cleanCreci = formData.creci.replace(/[^0-9]/g, '');
+      isValid = cleanCreci.length >= 2 && formData.creciUF !== '';
+    }
     setDocSuccess(isValid);
   }, [formData.cnpj, formData.creci, formData.creciUF, docType]);
 
@@ -233,7 +254,8 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
       const masked = maskCPF(val);
       setFormData({ ...formData, cnpj: masked });
     } else {
-      setFormData({ ...formData, creci: val.toUpperCase() });
+      const masked = maskCRECI(val);
+      setFormData({ ...formData, creci: masked });
     }
   };
 
@@ -242,6 +264,23 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     setFormData(prev => ({ ...prev, website: val }));
     if (val && !validateURL(val)) setUrlError('URL inválida');
     else setUrlError(null);
+  };
+
+  const handleSendEmail = () => {
+    if (formData.email && validateEmail(formData.email)) {
+      window.location.href = `mailto:${formData.email}`;
+    } else {
+      setEmailError('E-mail inválido para envio.');
+    }
+  };
+
+  const handleWhatsAppClick = () => {
+    if (formData.phone && validatePhone(formData.phone)) {
+      const cleanPhone = formData.phone.replace(/\D/g, '');
+      window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+    } else {
+      setPhoneError('Número inválido para WhatsApp.');
+    }
   };
 
   const handleAddHistory = () => {
@@ -263,23 +302,10 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     });
   };
 
-  const removeHistoryEntry = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      contactHistory: prev.contactHistory.filter(h => h.id !== id)
-    }));
-  };
-
-  const handleSendEmail = () => {
-    if (formData.email) {
-      window.location.href = `mailto:${formData.email}`;
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!docSuccess) {
-      alert(`Por favor, insira um ${docType} válido.`);
+      alert(`Por favor, insira um ${docType} e UF válidos.`);
       return;
     }
     if (!validateEmail(formData.email)) {
@@ -331,27 +357,41 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
               <div className="space-y-1.5 md:col-span-1">
                 <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
                   Registro CRECI e UF
-                  {docSuccess && <span className="text-green-500 animate-fadeIn" title="Válido">✅</span>}
+                  {docSuccess && (
+                    <div className="flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 animate-fadeIn">
+                      <span className="text-[10px] font-bold text-green-600">Válido</span>
+                      <span className="text-xs">✅</span>
+                    </div>
+                  )}
                 </label>
                 <div className="flex gap-2">
-                  <input required className={`flex-1 px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${docSuccess ? 'border-green-200' : 'border-slate-200'}`} value={formData.creci} onChange={onDocChange} placeholder="00000-J" />
-                  <select required className={`w-24 px-2 py-3 bg-slate-50 border rounded-xl ${docSuccess ? 'border-green-200' : 'border-slate-200'}`} value={formData.creciUF} onChange={e => setFormData({...formData, creciUF: e.target.value})}>
+                  <input required className={`flex-1 px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${docSuccess ? 'border-green-300 bg-green-50/20' : 'border-slate-200'}`} value={formData.creci} onChange={onDocChange} placeholder="00000-J" />
+                  <select required className={`w-24 px-2 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${formData.creciUF ? 'border-blue-200' : 'border-slate-200'}`} value={formData.creciUF} onChange={e => setFormData({...formData, creciUF: e.target.value})}>
                     <option value="">UF</option>
                     {BR_STATES.map(uf => <option key={uf} value={uf}>{uf}</option>)}
                   </select>
                 </div>
+                {!formData.creciUF && formData.creci && <p className="text-[9px] text-blue-500 font-bold ml-1">* Selecione a UF para validar</p>}
               </div>
             ) : (
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
                   {docType}
-                  {docSuccess && <span className="text-green-500 animate-fadeIn" title={`${docType} Válido`}>✅</span>}
+                  {docSuccess && (
+                    <div className="flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 animate-fadeIn">
+                      <span className="text-[10px] font-bold text-green-600">Válido</span>
+                    </div>
+                  )}
                 </label>
                 <div className="relative">
-                  <input required className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${docSuccess ? 'border-green-200 bg-green-50/20' : 'border-slate-200'}`} value={formData.cnpj} onChange={onDocChange} placeholder={docType === 'CNPJ' ? "00.000.000/0000-00" : "000.000.000-00"} />
+                  <input required className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${docSuccess ? 'border-green-300 bg-green-50/20' : 'border-slate-200'}`} value={formData.cnpj} onChange={onDocChange} placeholder={docType === 'CNPJ' ? "00.000.000/0000-00" : "000.000.000-00"} />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     {isSearching && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
-                    {docSuccess && !isSearching && <span className="text-xs">✔️</span>}
+                    {docSuccess && !isSearching && (
+                      <span className="flex items-center justify-center w-6 h-6 bg-green-500 text-white rounded-full text-[10px] shadow-sm animate-bounceIn">
+                        ✓
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -372,7 +412,18 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-500">Telefone Principal</label>
-              <input required type="text" className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${phoneError ? 'border-red-400' : 'border-slate-200'}`} value={formData.phone} onChange={e => { setFormData({ ...formData, phone: maskPhone(e.target.value) }); setPhoneError(null); }} placeholder="(00) 00000-0000" />
+              <div className="flex gap-2">
+                <input required type="text" className={`flex-1 px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${phoneError ? 'border-red-400' : 'border-slate-200'}`} value={formData.phone} onChange={e => { setFormData({ ...formData, phone: maskPhone(e.target.value) }); setPhoneError(null); }} placeholder="(00) 00000-0000" />
+                <button 
+                  type="button" 
+                  onClick={handleWhatsAppClick} 
+                  disabled={!validatePhone(formData.phone)} 
+                  className="px-4 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-sm disabled:bg-slate-300 disabled:opacity-50 active:scale-95" 
+                  title="Iniciar conversa no WhatsApp"
+                >
+                  💬
+                </button>
+              </div>
               {phoneError && <p className="text-[10px] text-red-500 font-bold ml-1">{phoneError}</p>}
             </div>
 
@@ -459,17 +510,25 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
                 <label className="text-[10px] font-black uppercase text-blue-600">Data da Interação</label>
                 <input type="date" className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-xl outline-none" value={newHistory.date} onChange={e => setNewHistory({...newHistory, date: e.target.value})} />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-blue-600">Tipo de Último Contato</label>
-                <select className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-xl outline-none font-medium" value={newHistory.type} onChange={e => setNewHistory({...newHistory, type: e.target.value as any})}>
-                  <option value="Telefone">📞 Telefone</option>
-                  <option value="WhatsApp">💬 WhatsApp</option>
-                  <option value="E-mail">📧 E-mail</option>
-                  <option value="Reunião">🤝 Reunião</option>
-                  <option value="Vídeo">🎥 Vídeo Chamada</option>
-                </select>
+              
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[10px] font-black uppercase text-blue-600">Canal de Contato</label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  {CONTACT_TYPES.map((type) => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => setNewHistory({ ...newHistory, type: type.value })}
+                      className={`py-2 px-1 flex flex-col items-center justify-center gap-1 rounded-xl border transition-all ${newHistory.type === type.value ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-blue-100 text-blue-700 hover:bg-blue-50'}`}
+                    >
+                      <span className="text-base">{type.icon}</span>
+                      <span className="text-[9px] font-bold uppercase truncate w-full text-center">{type.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-blue-600">Resumo da Conversa (Título)</label>
               <input className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-xl outline-none text-sm" placeholder="Ex: Demonstração de interesse..." value={newHistory.summary} onChange={e => setNewHistory({...newHistory, summary: e.target.value})} />
@@ -515,6 +574,17 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
           </button>
         </div>
       </form>
+      <style>{`
+        @keyframes bounceIn {
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.05); opacity: 1; }
+          70% { transform: scale(0.9); }
+          100% { transform: scale(1); }
+        }
+        .animate-bounceIn {
+          animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+      `}</style>
     </div>
   );
 };

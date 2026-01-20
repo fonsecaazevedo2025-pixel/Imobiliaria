@@ -54,12 +54,12 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({ compan
               
               {/* Interactive Contact Pills */}
               <div className="flex flex-wrap gap-2 mt-3">
-                {/* Email Pill */}
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100 group">
+                {/* Email Pill - Enhanced */}
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100 group transition-all hover:bg-blue-100">
                   <span className="text-[11px] font-bold truncate max-w-[140px]">{company.email}</span>
                   <a 
                     href={`mailto:${company.email}`} 
-                    className="flex items-center justify-center w-5 h-5 bg-white rounded-full shadow-sm border border-blue-200 hover:scale-110 transition-transform"
+                    className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full shadow-md hover:scale-110 transition-all active:scale-90"
                     title={`Enviar e-mail para ${company.email}`}
                   >
                     <span className="text-[10px]">📧</span>
@@ -73,7 +73,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({ compan
                     href={`https://wa.me/55${company.phone.replace(/\D/g, '')}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center w-5 h-5 bg-white rounded-full shadow-sm border border-green-200 hover:scale-110 transition-transform"
+                    className="flex items-center justify-center w-6 h-6 bg-green-600 text-white rounded-full shadow-md hover:scale-110 transition-all active:scale-90"
                     title={`Abrir WhatsApp para ${company.phone}`}
                   >
                     <span className="text-[10px]">💬</span>
@@ -88,7 +88,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({ compan
                       href={company.website.startsWith('http') ? company.website : `https://${company.website}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center w-5 h-5 bg-white rounded-full shadow-sm border border-slate-200 hover:scale-110 transition-transform"
+                      className="flex items-center justify-center w-6 h-6 bg-slate-800 text-white rounded-full shadow-md hover:scale-110 transition-all"
                     >
                       <span className="text-[10px]">🌐</span>
                     </a>
@@ -117,7 +117,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({ compan
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 text-sm font-bold shadow-sm hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all active:scale-[0.98]"
             >
               <img src="https://upload.wikimedia.org/wikipedia/commons/6/66/Waze_icon.png" alt="Waze" className="w-5 h-5 object-contain" />
-              Contatar
+              Ver Rota no Waze
             </button>
           </div>
 
