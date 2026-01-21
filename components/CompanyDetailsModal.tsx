@@ -54,7 +54,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({ compan
               
               {/* Interactive Contact Pills */}
               <div className="flex flex-wrap gap-2 mt-3">
-                {/* Email Pill - Enhanced */}
+                {/* Email Pill */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100 group transition-all hover:bg-blue-100">
                   <span className="text-[11px] font-bold truncate max-w-[140px]">{company.email}</span>
                   <a 
@@ -99,6 +99,10 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({ compan
               <div className="flex gap-2 mt-4">
                 <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${company.status === 'Ativo' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{company.status}</span>
                 <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-sm">{company.commissionRate}% Comis.</span>
+                {/* NOVO BADGE: NÚMERO DE CORRETORES */}
+                <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-800 text-white shadow-sm flex items-center gap-1">
+                  👥 {company.brokerCount} Corretores
+                </span>
               </div>
             </div>
           </div>

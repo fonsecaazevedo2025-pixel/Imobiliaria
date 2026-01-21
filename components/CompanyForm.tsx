@@ -497,6 +497,36 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
                 ))}
               </div>
             </div>
+            {/* NOVO CAMPO: NÚMERO DE CORRETORES */}
+            <div className="space-y-3 md:col-span-2">
+              <label className="text-[10px] font-black uppercase text-slate-500">Número de Corretores (Força de Vendas)</label>
+              <div className="flex gap-3 items-center">
+                <div className="relative flex-1">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">👥</span>
+                  <input 
+                    type="number" 
+                    min="0"
+                    placeholder="Quantidade de profissionais..."
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                    value={formData.brokerCount}
+                    onChange={e => setFormData({ ...formData, brokerCount: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="flex gap-1">
+                   {[5, 10, 20, 50].map(val => (
+                     <button 
+                      key={val}
+                      type="button" 
+                      onClick={() => setFormData({...formData, brokerCount: val})}
+                      className="px-3 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all"
+                     >
+                       +{val}
+                     </button>
+                   ))}
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-400 italic">* Este dado ajuda a IA a calcular o potencial de ROI do parceiro.</p>
+            </div>
           </div>
         </section>
 
