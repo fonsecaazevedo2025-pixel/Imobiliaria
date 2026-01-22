@@ -10,6 +10,9 @@ import { Company, DashboardStats } from './types';
 import { getAIInsights } from './services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
+// Chave do localStorage - mude aqui para criar uma base de dados totalmente nova/separada
+const STORAGE_KEY = 'partner_hub_v2_cos';
+
 const ShareLinkModal: React.FC<{ url: string; onClose: () => void }> = ({ url, onClose }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -66,7 +69,8 @@ const App: React.FC = () => {
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [minBrokers, setMinBrokers] = useState<string>('');
-  const [maxBrokers, setMaxBrokers] = useState<string>('');
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const publicRegistrationUrl = useMemo(() => `${window.location.origin}${window.location.pathname}?mode=register`, []);
 
@@ -74,7 +78,7 @@ const App: React.FC = () => {
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get('mode') === 'register') setIsPublicMode(true);
 
-    const saved = localStorage.getItem('partner_hub_v2_cos');
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       setCompanies(JSON.parse(saved));
     } else {
@@ -88,12 +92,12 @@ const App: React.FC = () => {
         contactHistory: [{ id: 'h1', date: '2024-03-20', type: 'Reunião', summary: 'Definição de novas metas.' }]
       }];
       setCompanies(mock);
-      localStorage.setItem('partner_hub_v2_cos', JSON.stringify(mock));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mock));
     }
   }, []);
 
   useEffect(() => {
-    if (companies.length > 0) localStorage.setItem('partner_hub_v2_cos', JSON.stringify(companies));
+    if (companies.length >= 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(companies));
   }, [companies]);
 
   const stats: DashboardStats = useMemo(() => {
@@ -148,11 +152,54 @@ const App: React.FC = () => {
 
   const handleEdit = (c: Company) => { setEditingCompany(c); setShowForm(true); setActiveTab('companies'); };
 
+  const handleDuplicate = (c: Company) => {
+    const duplicated: Company = {
+      ...c,
+      id: Math.random().toString(36).substr(2, 9),
+      name: `${c.name} (Cópia)`,
+      registrationDate: new Date().toISOString().split('T')[0],
+      contactHistory: [] // Histórico não é duplicado por segurança
+    };
+    setCompanies([duplicated, ...companies]);
+    alert(`Parceiro "${c.name}" duplicado com sucesso!`);
+  };
+
   const fetchAIInsights = async () => {
     setLoadingInsights(true);
     const res = await getAIInsights(companies);
     setAiInsights(res);
     setLoadingInsights(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCompanies.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCompanies.map(c => c.id)));
+    }
+  };
+
+  const handleBulkStatusChange = (newStatus: 'Ativo' | 'Inativo') => {
+    if (selectedIds.size === 0) return;
+    setCompanies(companies.map(c => 
+      selectedIds.has(c.id) ? { ...c, status: newStatus } : c
+    ));
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} parceiros selecionados?`)) {
+      setCompanies(companies.filter(c => !selectedIds.has(c.id)));
+      setSelectedIds(new Set());
+    }
   };
 
   if (isPublicMode) {
@@ -246,7 +293,6 @@ const App: React.FC = () => {
         <div className="space-y-6 animate-fadeIn">
           {!showForm ? (
             <>
-              {/* Filtros Avançados */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="relative flex-1">
@@ -273,10 +319,32 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              {selectedIds.size > 0 && (
+                <div className="flex items-center justify-between px-6 py-4 bg-blue-600 text-white rounded-2xl shadow-xl animate-slideDown no-print">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-bold">{selectedIds.size} itens selecionados</span>
+                    <button onClick={() => setSelectedIds(new Set())} className="text-xs bg-white/20 px-3 py-1 rounded-lg hover:bg-white/30 transition-all">Desmarcar Todos</button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleBulkStatusChange('Ativo')} className="px-4 py-2 bg-white text-blue-600 rounded-xl text-xs font-bold shadow-sm hover:bg-blue-50 transition-all">Ativar Selecionados</button>
+                    <button onClick={() => handleBulkStatusChange('Inativo')} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm hover:bg-slate-900 transition-all">Inativar Selecionados</button>
+                    <button onClick={handleBulkDelete} className="px-4 py-2 bg-red-500 text-white rounded-xl text-xs font-bold shadow-sm hover:bg-red-600 transition-all">Excluir</button>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 border-b">
                     <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                      <th className="px-6 py-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                          checked={selectedIds.size > 0 && selectedIds.size === filteredCompanies.length}
+                          onChange={toggleSelectAll}
+                        />
+                      </th>
                       <th className="px-6 py-4">Empresa</th>
                       <th className="px-6 py-4">Gestores</th>
                       <th className="px-6 py-4">Status</th>
@@ -286,7 +354,15 @@ const App: React.FC = () => {
                   </thead>
                   <tbody className="divide-y">
                     {filteredCompanies.map(c => (
-                      <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={c.id} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(c.id) ? 'bg-blue-50/50' : ''}`}>
+                        <td className="px-6 py-4">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={selectedIds.has(c.id)}
+                            onChange={() => toggleSelect(c.id)}
+                          />
+                        </td>
                         <td className="px-6 py-4">
                           <p className="font-bold text-slate-800">{c.name}</p>
                           <p className="text-[10px] text-slate-400 font-mono">{c.cnpj}</p>
@@ -305,10 +381,11 @@ const App: React.FC = () => {
                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${c.status === 'Ativo' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{c.status}</span>
                         </td>
                         <td className="px-6 py-4 text-center font-bold text-slate-600">{c.brokerCount}</td>
-                        <td className="px-6 py-4 text-right space-x-2">
-                          <button onClick={() => setSelectedCompanyForDetails(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">👁️</button>
-                          <button onClick={() => handleEdit(c)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg">✏️</button>
-                          <button onClick={() => setCompanyToDelete(c)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg">🗑️</button>
+                        <td className="px-6 py-4 text-right space-x-1">
+                          <button onClick={() => setSelectedCompanyForDetails(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Ver Detalhes">👁️</button>
+                          <button onClick={() => handleEdit(c)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar">✏️</button>
+                          <button onClick={() => handleDuplicate(c)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Duplicar Parceiro">📑</button>
+                          <button onClick={() => setCompanyToDelete(c)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">🗑️</button>
                         </td>
                       </tr>
                     ))}
@@ -329,7 +406,7 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'map' && <InteractiveMap companies={companies} />}
-      {activeTab === 'reports' && <ReportsView companies={companies} onEdit={handleEdit} onDelete={(id) => setCompanyToDelete(companies.find(c => c.id === id) || null)} onView={setSelectedCompanyForDetails} />}
+      {activeTab === 'reports' && <ReportsView companies={companies} onEdit={handleEdit} onDelete={(id) => setCompanyToDelete(companies.find(c => c.id === id) || null)} onView={setSelectedCompanyForDetails} onDuplicate={handleDuplicate} />}
       
       {selectedCompanyForDetails && <CompanyDetailsModal company={selectedCompanyForDetails} onClose={() => setSelectedCompanyForDetails(null)} />}
       {companyToDelete && <DeleteConfirmationModal company={companyToDelete} onConfirm={() => { setCompanies(companies.filter(x => x.id !== companyToDelete.id)); setCompanyToDelete(null); }} onCancel={() => setCompanyToDelete(null)} />}

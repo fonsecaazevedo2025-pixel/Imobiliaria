@@ -96,6 +96,10 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     if (r.length === 0) return "";
     if (r.length <= 2) return `(${r}`;
     if (r.length <= 6) return `(${r.substring(0, 2)}) ${r.substring(2)}`;
+    
+    // Transição dinâmica do hífen:
+    // Se tiver 10 dígitos (fixo): (XX) XXXX-XXXX
+    // Se tiver 11 dígitos (celular): (XX) XXXXX-XXXX
     if (r.length <= 10) {
       return `(${r.substring(0, 2)}) ${r.substring(2, 6)}-${r.substring(6)}`;
     } else {
@@ -164,6 +168,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
   const [docSuccess, setDocSuccess] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -192,12 +197,26 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
       isValid = cleanCreci.length >= 2 && formData.creciUF !== '';
     }
     setDocSuccess(isValid);
-  }, [formData.cnpj, formData.creci, formData.creciUF, docType]);
+    if (formData.cnpj.length > 0 && !isValid && !isSearching) {
+       // Only show local validation error if not checking API
+       if ((docType === 'CNPJ' && formData.cnpj.replace(/\D/g, '').length === 14) || 
+           (docType === 'CPF' && formData.cnpj.replace(/\D/g, '').length === 11)) {
+         setDocError(`${docType} inválido.`);
+       } else {
+         setDocError(null);
+       }
+    } else {
+      setDocError(null);
+    }
+  }, [formData.cnpj, formData.creci, formData.creciUF, docType, isSearching]);
 
   const handleCNPJLookup = async (cnpj: string) => {
     const clean = cnpj.replace(/\D/g, '');
     if (clean.length !== 14 || !validateCNPJ(clean)) return;
+    
     setIsSearching(true);
+    setDocError(null);
+    
     try {
       const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
       if (resp.ok) {
@@ -212,8 +231,21 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
           state: data.uf || '',
           number: data.numero || '',
         }));
+        setDocSuccess(true);
+      } else {
+        if (resp.status === 404) {
+          setDocError("CNPJ não encontrado na base da Receita.");
+        } else {
+          setDocError("Erro ao consultar CNPJ. Tente novamente.");
+        }
+        setDocSuccess(false);
       }
-    } catch (e) { console.error(e); } finally { setIsSearching(false); }
+    } catch (e) { 
+      console.error(e); 
+      setDocError("Falha na conexão ao consultar CNPJ.");
+    } finally { 
+      setIsSearching(false); 
+    }
   };
 
   const handleCEPLookup = async (cep: string) => {
@@ -336,6 +368,13 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
     });
   };
 
+  const toggleStatus = () => {
+    setFormData(prev => ({
+      ...prev,
+      status: prev.status === 'Ativo' ? 'Inativo' : 'Ativo'
+    }));
+  };
+
   return (
     <div className={`bg-white rounded-2xl p-8 shadow-sm border border-slate-200 w-full mx-auto animate-fadeIn ${isPublic ? '' : 'max-w-2xl overflow-y-auto max-h-[90vh]'}`}>
       <div className="mb-8">
@@ -347,7 +386,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
         <section className="space-y-4">
           <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-4">
             {(['CNPJ', 'CPF', 'CRECI'] as const).map(type => (
-              <button key={type} type="button" onClick={() => { setDocType(type); setDocSuccess(false); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${docType === type ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
+              <button key={type} type="button" onClick={() => { setDocType(type); setDocSuccess(false); setDocError(null); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${docType === type ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
                 {type}
               </button>
             ))}
@@ -384,7 +423,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
                   )}
                 </label>
                 <div className="relative">
-                  <input required className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${docSuccess ? 'border-green-300 bg-green-50/20' : 'border-slate-200'}`} value={formData.cnpj} onChange={onDocChange} placeholder={docType === 'CNPJ' ? "00.000.000/0000-00" : "000.000.000-00"} />
+                  <input required className={`w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 ${docSuccess ? 'border-green-300 bg-green-50/20' : (docError ? 'border-red-400' : 'border-slate-200')}`} value={formData.cnpj} onChange={onDocChange} placeholder={docType === 'CNPJ' ? "00.000.000/0000-00" : "000.000.000-00"} />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     {isSearching && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
                     {docSuccess && !isSearching && (
@@ -394,6 +433,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
                     )}
                   </div>
                 </div>
+                {docError && <p className="text-[10px] text-red-500 font-bold ml-1 animate-slideDown">{docError}</p>}
               </div>
             )}
             <div className="space-y-1.5">
@@ -484,9 +524,19 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase text-slate-500">Status do Parceiro</label>
-              <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-                <button type="button" onClick={() => setFormData({ ...formData, status: 'Ativo' })} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.status === 'Ativo' ? 'bg-green-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>Ativo</button>
-                <button type="button" onClick={() => setFormData({ ...formData, status: 'Inativo' })} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.status === 'Inativo' ? 'bg-slate-400 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>Inativo</button>
+              <div className="flex items-center gap-3">
+                <button 
+                  type="button" 
+                  onClick={toggleStatus}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${formData.status === 'Ativo' ? 'bg-green-500' : 'bg-slate-300'}`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.status === 'Ativo' ? 'translate-x-8' : 'translate-x-1'}`}
+                  />
+                </button>
+                <span className={`text-xs font-bold uppercase ${formData.status === 'Ativo' ? 'text-green-600' : 'text-slate-500'}`}>
+                  {formData.status}
+                </span>
               </div>
             </div>
             <div className="space-y-3">
@@ -497,9 +547,9 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
                 ))}
               </div>
             </div>
-            {/* NOVO CAMPO: NÚMERO DE CORRETORES */}
+            
             <div className="space-y-3 md:col-span-2">
-              <label className="text-[10px] font-black uppercase text-slate-500">Número de Corretores (Força de Vendas)</label>
+              <label className="text-[10px] font-black uppercase text-slate-500">Pontuação de Corretores (Força de Vendas)</label>
               <div className="flex gap-3 items-center">
                 <div className="relative flex-1">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">👥</span>
@@ -517,7 +567,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
                      <button 
                       key={val}
                       type="button" 
-                      onClick={() => setFormData({...formData, brokerCount: val})}
+                      onClick={() => setFormData(prev => ({...prev, brokerCount: prev.brokerCount + val}))}
                       className="px-3 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all"
                      >
                        +{val}
@@ -599,8 +649,8 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
 
         <div className="flex gap-4 pt-4">
           {!isPublic && <button type="button" onClick={onCancel} className="flex-1 py-4 bg-white text-slate-600 border rounded-xl font-bold">Cancelar</button>}
-          <button type="submit" disabled={!docSuccess} className={`flex-[2] py-4 text-white rounded-xl font-bold shadow-xl transition-all active:scale-95 ${docSuccess ? 'bg-blue-600 shadow-blue-200 hover:bg-blue-700' : 'bg-slate-300 shadow-none cursor-not-allowed'}`}>
-            {isPublic ? 'Finalizar Cadastro' : (initialData ? 'Atualizar Dados' : 'Concluir Registro')}
+          <button type="submit" disabled={!docSuccess || isSearching} className={`flex-[2] py-4 text-white rounded-xl font-bold shadow-xl transition-all active:scale-95 ${(docSuccess && !isSearching) ? 'bg-blue-600 shadow-blue-200 hover:bg-blue-700' : 'bg-slate-300 shadow-none cursor-not-allowed'}`}>
+            {isSearching ? 'Validando...' : (isPublic ? 'Finalizar Cadastro' : (initialData ? 'Atualizar Dados' : 'Concluir Registro'))}
           </button>
         </div>
       </form>
@@ -613,6 +663,13 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({ onSave, onCancel, init
         }
         .animate-bounceIn {
           animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>

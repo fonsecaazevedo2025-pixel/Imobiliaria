@@ -11,16 +11,11 @@ interface ReportsViewProps {
   onEdit: (company: Company) => void;
   onDelete: (id: string) => void;
   onView: (company: Company) => void;
+  onDuplicate: (company: Company) => void;
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onDelete, onView }) => {
+export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onDelete, onView, onDuplicate }) => {
   const [isGeneratingGeoReport, setIsGeneratingGeoReport] = useState(false);
-
-  const handlePrint = () => {
-    setTimeout(() => {
-      window.print();
-    }, 100);
-  };
 
   const handleExportSummaryPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -130,10 +125,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
                 </tbody>
             </table>
         </div>
-        
-        <footer class="mt-8 text-center text-xs text-slate-400">
-            © ${new Date().getFullYear()} PartnerHub - Sistema de Gestão de Imobiliárias
-        </footer>
     </div>
 </body>
 </html>`;
@@ -147,10 +138,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
   };
 
   const handleExportGeographicPDF = async () => {
-    if (companies.length === 0) {
-      alert("Não há dados para gerar o relatório geográfico.");
-      return;
-    }
+    if (companies.length === 0) return;
     setIsGeneratingGeoReport(true);
     try {
       const mapContainer = document.createElement('div');
@@ -175,7 +163,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
       });
       if (markers.length > 0) map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
       await new Promise(resolve => setTimeout(resolve, 2000));
-      const canvas = await html2canvas(mapContainer, { useCORS: true, logging: false, allowTaint: true });
+      const canvas = await html2canvas(mapContainer, { useCORS: true, logging: false });
       const mapImageData = canvas.toDataURL('image/png');
       const doc = new jsPDF('p', 'mm', 'a4');
       doc.setFontSize(20);
@@ -198,7 +186,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
       document.body.removeChild(mapContainer);
     } catch (error) {
       console.error(error);
-      alert("Houve um erro ao processar o mapa.");
     } finally {
       setIsGeneratingGeoReport(false);
     }
@@ -206,7 +193,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
 
   const handleExportCompanyPDF = (company: Company) => {
     const doc = new jsPDF();
-    const dateStr = new Date().toLocaleString('pt-BR');
     doc.setFontSize(22);
     doc.setTextColor(37, 99, 235);
     doc.text('PartnerHub', 14, 20);
@@ -290,10 +276,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Parceiro Imobiliário</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Gestores (Parceria / Hub)</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Gestores</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Status</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Comissão</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right no-print">Prontuário Individual</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right no-print">Ações Rápidas</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -313,9 +299,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ companies, onEdit, onD
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center font-bold text-emerald-600">{company.commissionRate}%</td>
-                <td className="px-6 py-4 text-right no-print">
+                <td className="px-6 py-4 text-right no-print space-x-1">
+                  <button onClick={() => onDuplicate(company)} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg border border-transparent hover:border-amber-100" title="Duplicar">📑</button>
                   <button type="button" onClick={() => handleExportCompanyPDF(company)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-bold border border-blue-100">
-                    <span>📥</span> Baixar PDF
+                    <span>📥</span> PDF
                   </button>
                 </td>
               </tr>
